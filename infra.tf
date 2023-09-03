@@ -178,10 +178,16 @@ resource "oci_containerengine_node_pool" "k8s_node_pool" {
   ssh_public_key = var.ssh_public_key
 }
 
-resource "oci_artifacts_container_repository" "docker_repository" {
-  compartment_id = var.compartment_id
-  display_name   = "free-kubernetes-nginx"
+# export kube config
+resource "null_resource" "export_kube_config" {
 
-  is_immutable = false
-  is_public    = false
+  provisioner "local-exec" {
+    command = "oci ce cluster create-kubeconfig --cluster-id $cluster_id --file $kube_config --region $oci_region --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT"
+
+    environment = {
+      cluster_id = oci_containerengine_cluster.k8s_cluster.id
+      oci_region = var.region
+      kube_config = var.kube_config_path
+    }
+  }
 }
