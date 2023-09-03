@@ -4,7 +4,7 @@ provider "oci" {
 
 module "vcn" {
   source  = "oracle-terraform-modules/vcn/oci"
-  version = "3.1.0"
+  version = "3.5.4"
 
   compartment_id = var.compartment_id
   region         = var.region
@@ -41,28 +41,6 @@ resource "oci_core_security_list" "private_subnet_sl" {
     source_type = "CIDR_BLOCK"
     protocol    = "all"
   }
-
-  ingress_security_rules {
-    stateless   = false
-    source      = "10.0.0.0/24"
-    source_type = "CIDR_BLOCK"
-    protocol    = "6"
-    tcp_options {
-      min = 10256
-      max = 10256
-    }
-  }
-
-  ingress_security_rules {
-    stateless   = false
-    source      = "10.0.0.0/24"
-    source_type = "CIDR_BLOCK"
-    protocol    = "6"
-    tcp_options {
-      min = 31600
-      max = 31600
-    }
-  }
 }
 
 resource "oci_core_security_list" "public_subnet_sl" {
@@ -77,40 +55,6 @@ resource "oci_core_security_list" "public_subnet_sl" {
     destination_type = "CIDR_BLOCK"
     protocol         = "all"
   }
-  
-  egress_security_rules {
-    stateless        = false
-    destination      = "10.0.1.0/24"
-    destination_type = "CIDR_BLOCK"
-    protocol         = "6"
-    tcp_options {
-      min = 31600
-      max = 31600
-    }
-  }
-
-  egress_security_rules {
-    stateless        = false
-    destination      = "10.0.1.0/24"
-    destination_type = "CIDR_BLOCK"
-    protocol         = "6"
-    tcp_options {
-      min = 10256
-      max = 10256
-    }
-  }
-
-  ingress_security_rules {
-    protocol    = "6"
-    source      = "0.0.0.0/0"
-    source_type = "CIDR_BLOCK"
-    stateless   = false
-
-    tcp_options {
-      max = 80
-      min = 80
-    }
-  } 
 
   ingress_security_rules {
     stateless   = false
@@ -120,6 +64,7 @@ resource "oci_core_security_list" "public_subnet_sl" {
   }
 
   ingress_security_rules {
+    description = "For kubectl to manipulate the Kubernetes cluster."
     stateless   = false
     source      = "0.0.0.0/0"
     source_type = "CIDR_BLOCK"
@@ -154,7 +99,7 @@ resource "oci_core_subnet" "vcn_public_subnet" {
 
 resource "oci_containerengine_cluster" "k8s_cluster" {
   compartment_id     = var.compartment_id
-  kubernetes_version = "v1.21.5"
+  kubernetes_version = var.k8s_ver
   name               = "free-k8s-cluster"
   vcn_id             = module.vcn.vcn_id
 
@@ -185,21 +130,21 @@ locals {
   azs = data.oci_identity_availability_domains.ads.availability_domains[*].name
 }
 
-data "oci_core_images" "latest_image" {
-  compartment_id = var.compartment_id
-  operating_system = "Oracle Linux"
-  operating_system_version = "7.9"
-  filter {
-    name   = "display_name"
-    values = ["^.*aarch64-.*$"]
-    regex = true
-  }
-}
+# data "oci_core_images" "latest_image" {
+#   compartment_id = var.compartment_id
+#   operating_system = "Oracle Linux"
+#   operating_system_version = "7.9"
+#   filter {
+#     name   = "display_name"
+#     values = ["^.*aarch64-.*$"]
+#     regex = true
+#   }
+# }
 
 resource "oci_containerengine_node_pool" "k8s_node_pool" {
   cluster_id         = oci_containerengine_cluster.k8s_cluster.id
   compartment_id     = var.compartment_id
-  kubernetes_version = "v1.21.5"
+  kubernetes_version = var.k8s_ver
   name               = "free-k8s-node-pool"
   node_config_details {
     dynamic placement_configs {
@@ -215,12 +160,13 @@ resource "oci_containerengine_node_pool" "k8s_node_pool" {
   node_shape = "VM.Standard.A1.Flex"
 
   node_shape_config {
-    memory_in_gbs = 6
-    ocpus         = 1
+    memory_in_gbs = 12
+    ocpus         = 2
   }
 
   node_source_details {
-    image_id    = data.oci_core_images.latest_image.images.0.id
+    # image_id    = data.oci_core_images.latest_image.images.0.id
+    image_id    = var.image_id
     source_type = "image"
   }
 
