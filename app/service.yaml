@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-example
+spec:
+  selector:
+    app: httpbin
+  ports:
+  - name: service-port
+    port: 8000
+    targetPort: 80

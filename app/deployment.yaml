@@ -1,22 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-deployment
-  labels:
-    app: nginx
+  name: deployment-example
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
-      app: nginx
+      app: httpbin
   template:
     metadata:
       labels:
-        app: nginx
+        app: httpbin
     spec:
       containers:
-      - name: nginx
-        image: nginx:1.16.1
+      - name: httpbin
+        image: docker.io/kong/httpbin
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
-          name: nginx-port
