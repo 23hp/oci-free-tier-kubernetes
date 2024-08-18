@@ -177,6 +177,13 @@ resource "oci_containerengine_node_pool" "k8s_node_pool" {
   ssh_public_key = var.ssh_public_key
 }
 
+resource "oci_artifacts_container_repository" "docker_repository" {
+  compartment_id = var.compartment_id
+  display_name   = "free-docker-repo"
+  is_immutable = false
+  is_public    = false
+}
+
 # export kube config
 resource "null_resource" "export_kube_config" {
 
