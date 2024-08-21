@@ -34,7 +34,7 @@ resource "oci_core_security_list" "private_subnet_sl" {
     destination_type = "CIDR_BLOCK"
     protocol         = "all"
   }
-  
+
   ingress_security_rules {
     stateless   = false
     source      = "10.0.0.0/16"
@@ -131,37 +131,34 @@ locals {
 }
 
 data "oci_core_images" "latest_image" {
-  compartment_id = var.compartment_id
-  operating_system = "Oracle Linux"
+  compartment_id           = var.compartment_id
+  operating_system         = "Oracle Linux"
   operating_system_version = "7.9"
   filter {
     name   = "display_name"
     values = ["^.*aarch64-.*$"]
-    regex = true
+    regex  = true
   }
 }
 
-resource "oci_containerengine_node_pool" "k8s_node_pool" {
+resource "oci_containerengine_node_pool" "k8s_node_pool_smart" {
   cluster_id         = oci_containerengine_cluster.k8s_cluster.id
   compartment_id     = var.compartment_id
   kubernetes_version = var.k8s_ver
-  name               = "free-k8s-node-pool"
+  name               = "smart-node-pool"
   node_config_details {
-    dynamic placement_configs {
-      for_each = local.azs
-      content {
-        availability_domain = placement_configs.value
-        subnet_id           = oci_core_subnet.vcn_private_subnet.id
-      }
+    placement_configs {
+      availability_domain = local.azs[0]
+      subnet_id           = oci_core_subnet.vcn_private_subnet.id
     }
-    size = 2
+    size = 1
 
   }
   node_shape = "VM.Standard.A1.Flex"
 
   node_shape_config {
-    memory_in_gbs = 12
-    ocpus         = 2
+    memory_in_gbs = 6
+    ocpus         = 1
   }
 
   node_source_details {
@@ -171,7 +168,40 @@ resource "oci_containerengine_node_pool" "k8s_node_pool" {
 
   initial_node_labels {
     key   = "name"
-    value = "free-k8s-cluster"
+    value = "smart"
+  }
+
+  ssh_public_key = var.ssh_public_key
+}
+
+resource "oci_containerengine_node_pool" "k8s_node_pool_hound" {
+  cluster_id         = oci_containerengine_cluster.k8s_cluster.id
+  compartment_id     = var.compartment_id
+  kubernetes_version = var.k8s_ver
+  name               = "hound-node-pool"
+  node_config_details {
+    placement_configs {
+      availability_domain = local.azs[1]
+      subnet_id           = oci_core_subnet.vcn_private_subnet.id
+    }
+    size = 1
+
+  }
+  node_shape = "VM.Standard.A1.Flex"
+
+  node_shape_config {
+    memory_in_gbs = 18
+    ocpus         = 3
+  }
+
+  node_source_details {
+    image_id    = data.oci_core_images.latest_image.images.0.id
+    source_type = "image"
+  }
+
+  initial_node_labels {
+    key   = "name"
+    value = "strong"
   }
 
   ssh_public_key = var.ssh_public_key
@@ -180,8 +210,8 @@ resource "oci_containerengine_node_pool" "k8s_node_pool" {
 resource "oci_artifacts_container_repository" "docker_repository" {
   compartment_id = var.compartment_id
   display_name   = "free-docker-repo"
-  is_immutable = false
-  is_public    = false
+  is_immutable   = false
+  is_public      = false
 }
 
 # export kube config
@@ -191,8 +221,8 @@ resource "null_resource" "export_kube_config" {
     command = "oci ce cluster create-kubeconfig --cluster-id $cluster_id --file $kube_config --region $oci_region --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT"
 
     environment = {
-      cluster_id = oci_containerengine_cluster.k8s_cluster.id
-      oci_region = var.region
+      cluster_id  = oci_containerengine_cluster.k8s_cluster.id
+      oci_region  = var.region
       kube_config = var.kube_config_path
     }
   }
