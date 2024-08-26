@@ -1,35 +1,28 @@
 # Set up an application in k8s
 
+## Install [Istio](https://istio.io/latest/docs/ambient/getting-started/)
+``` bash
+curl -L https://istio.io/downloadIstio | sh -
+cd istio-1.23.0
+export PATH=$PWD/bin:$PATH
+```
+
 ## Install Gateway API CRDs
 
-Check latest version [here](https://gateway-api.sigs.k8s.io/v1alpha2/guides/#install-standard-channel)
+Check [latest version](https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api)
  
 ``` bash
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v0.8.1/standard-install.yaml
+kubectl get crd gateways.gateway.networking.k8s.io &> /dev/null || \
+  { kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml; }
 ```
 
 
-## Install Istio via Helm
+## Install Istio using the ambient profile
 ``` bash
-helm repo add istio https://istio-release.storage.googleapis.com/charts
-helm repo update
+istioctl install --set profile=ambient --skip-confirmation
 
-# Install the Istio base chart
-kubectl create namespace istio-system
-helm install istio-base istio/base -n istio-system --set defaultRevision=default
-helm ls -n istio-system
-
-# Install the Istio discovery chart
-helm install istiod istio/istiod -n istio-system --wait
-helm ls -n istio-system
-
-# Status check
-helm status istiod -n istio-system
-kubectl get deployments -n istio-system --output wide
-
-# Enable istio-injection 
-kubectl label namespace default istio-injection=enabled
 ``` 
+
 ## Deploy the app
 ``` bash
 # Making sure we are in the right folders
@@ -54,14 +47,10 @@ echo $INGRESS_HOST
 kubectl delete -f gateway.yaml -f httproute.yaml -f deployment.yaml -f service.yaml
 kubectl delete namespace ingress
 # Remove istio
-helm ls -n istio-system
-kubectl label namespace default istio-injection-
-helm delete istiod -n istio-system
-helm delete istio-base -n istio-system
+istioctl uninstall --purge -y
 kubectl delete namespace istio-system
-kubectl get crd -oname | grep --color=never 'istio.io' | xargs kubectl delete
 # Remove Gateway API CRDs
-kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v0.8.1/standard-install.yaml
+kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml
 ``` 
 
 
